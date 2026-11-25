@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smart Waste Collection Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a municipal control room — calm, exact, operational.
+   IDEA: the ward's waste-collection control board that runs the EVS flowchart live.
+   PICTURE: a ward street map with live bins (fill rings) and trucks driving optimised routes.
+   COLOUR and TYPE: the flowchart's deep green as the field, mint support, red/amber for urgency; Public Sans.
+   LAYOUT: green header band with clock and controls, map + live flowchart tracker, then vehicles, complaints, activity, bin register. */
+:root{color-scheme:light dark;
+--bg:light-dark(#f2f6f3,#0c1411);--panel:light-dark(#ffffff,#131e19);--ink:light-dark(#13241c,#e4eee8);
+--muted:light-dark(#57695f,#98aea2);--line:light-dark(#d8e3dc,#24352d);--brand:light-dark(#1d5c45,#1f6a4f);
+--mint:light-dark(#dcefe5,#1a3329);--road:light-dark(#c9d6ce,#26352e);--block:light-dark(#edf3ef,#111b17);
+--park:light-dark(#cde7d5,#173226);--ok:#2f9e6b;--warn:#d99a00;--bad:#d23c2f;--accent:#e2702a}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Public Sans",system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{margin:0;line-height:1.1;text-wrap:balance}
+h2{font-size:18px;font-weight:800;margin-bottom:10px}
+.top{background:var(--brand);color:#fff;padding:22px max(4vw,16px) 18px}
+.top .row{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:flex-end;justify-content:space-between;max-width:1400px;margin:auto}
+.top h1{font-size:clamp(26px,3.4vw,40px);font-weight:800}
+.top p{margin:6px 0 0;opacity:.85;font-size:15px}
+.clock{font-size:clamp(26px,3vw,36px);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.clock small{display:block;font-size:13px;font-weight:600;opacity:.8}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:1400px;margin:14px auto 0}
+button,select,input{font:inherit;font-size:16px}
+.ctrl button,.ctrl select{min-height:44px;border-radius:10px;border:1px solid #ffffff55;background:#ffffff1a;color:#fff;padding:0 14px;cursor:pointer}
+.ctrl select option{color:#000}
+.ctrl button:hover{background:#ffffff33}.ctrl .primary{background:#fff;color:var(--brand);font-weight:800;border-color:#fff}
+.ctrl .walk{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;background:#fff;color:var(--brand);font-weight:800;text-decoration:none;margin-left:auto}
+.ctrl label{display:flex;align-items:center;gap:8px;font-size:15px;padding:0 6px;min-height:44px}
+.ctrl input[type=range]{accent-color:#fff;width:130px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+main{max-width:1400px;margin:auto;padding:16px max(2vw,12px) 40px;display:grid;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.grid1{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media(max-width:1100px){.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.grid1,.grid2{grid-template-columns:minmax(0,1fr)}}
+.mapwrap{position:relative;aspect-ratio:3/2;border-radius:10px;overflow:hidden}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block}
+#map .bin{cursor:pointer}
+#map text{font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+#sel{margin-top:8px;font-size:14px;min-height:21px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kpi span{font-size:13px;color:var(--muted)}
+#flow{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+#flow li{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 8px;border-radius:8px;font-size:13.5px;transition:background .5s}
+#flow li.hot{background:var(--mint);font-weight:600}
+#flow li em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+#flow svg{width:20px;height:16px;fill:var(--mint);stroke:light-dark(#1d5c45,#5fc29a);stroke-width:1.6}
+.sub{font-size:13px;color:var(--muted);margin:-4px 0 10px}
+.truck{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.truck header{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.truck .tag{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.truck p{margin:4px 0 0;font-size:13.5px;color:var(--muted)}
+.bar{height:8px;background:var(--line);border-radius:5px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;border-radius:5px}
+.btn{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-size:14px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.main{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:700;font-size:16px}
+form{display:grid;gap:10px}
+form label{display:grid;gap:4px;font-size:14px;font-weight:600}
+form select,form input{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 10px;font-weight:400}
+#fmsg{font-size:14px;min-height:21px;margin:0}
+.clist{margin-top:14px;display:grid;gap:6px;max-height:260px;overflow:auto}
+.c{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13.5px;border-top:1px solid var(--line);padding-top:6px}
+.chip{font-size:12px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.s-Received{background:#fde7d6;color:#8a3b0c}.s-Scheduled{background:#dbe7ff;color:#1c3f91}.s-Resolved{background:#d6f0e2;color:#145a3a}
+.filters{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.filters button{min-height:36px;border-radius:18px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 12px;font-size:13px;cursor:pointer}
+.filters button[aria-pressed=true]{background:var(--brand);color:#fff;border-color:var(--brand)}
+#log{list-style:none;margin:0;padding:0;max-height:420px;overflow:auto;font-size:13.5px}
+#log li{padding:6px 0;border-top:1px solid var(--line);display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px}
+#log time{color:var(--muted);font-variant-numeric:tabular-nums}
+#log b{font-weight:700;margin-right:4px}
+#log .note b{color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.on td{background:var(--mint)}
+tbody tr{cursor:pointer}
+.fillcell{display:flex;align-items:center;gap:8px}.fillcell .bar{flex:1;margin:0;min-width:60px}.fillcell span{width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.st{font-weight:600;white-space:nowrap}
+details{font-size:15px}details summary{cursor:pointer;font-weight:800;font-size:17px;min-height:32px}
+details ol{padding-left:20px}details li{margin:4px 0}
+.foot{font-size:13px;color:var(--muted);text-align:center}
+@media(prefers-reduced-motion:reduce){#flow li{transition:none}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--muted)}.stack td:empty{display:none}.ctrl input[type=range]{width:100px}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="top">
+  <div class="row">
+    <div>
+      <h1>Smart Waste Collection and Monitoring System</h1>
+      <p>Working prototype: a digital solution for irregular garbage collection. The sensor data is simulated.</p>
+    </div>
+    <div class="clock" id="clock">Day 1 · 06:00<small>Simulated ward time</small></div>
+  </div>
+  <div class="ctrl">
+    <button id="play" class="primary" type="button">Pause</button>
+    <select id="speed" aria-label="Simulation speed"><option value="1">Speed 1×</option><option value="3" selected>Speed 3×</option><option value="6">Speed 6×</option></select>
+    <label for="thr">Pickup threshold <input id="thr" type="range" min="60" max="95" step="5" value="80"> <b id="thrv">80%</b></label>
+    <button id="cycle" type="button">Run check now</button>
+    <button id="fault" type="button">Inject sensor fault</button>
+    <button id="reset" type="button">Reset</button>
+    <a class="walk" href="walkthrough.html">Guided walkthrough →</a>
+  </div>
+</header>
+
+<main>
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <div class="grid1">
+    <section class="card">
+      <h2>Ward map: live bins and vehicles</h2>
+      <div class="mapwrap"><svg id="map" viewBox="0 0 960 640" role="img" aria-label="Ward map with bins and trucks"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i>Below 50%</span>
+        <span><i style="background:var(--warn)"></i>50% to threshold</span>
+        <span><i style="background:var(--bad)"></i>At or above threshold</span>
+        <span><i style="background:var(--accent)"></i>Open complaint</span>
+        <span>Dashed line: a truck's planned route. Tap a bin to select it.</span>
+      </div>
+      <div id="sel"></div>
+    </section>
+    <section class="card">
+      <h2>Flowchart, running live</h2>
+      <p class="sub">Each step lights up when the system executes it. The counts show how many times it has run.</p>
+      <ul id="flow"></ul>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Vehicles</h2>
+      <div id="trucks"></div>
+    </section>
+    <section class="card">
+      <h2>Citizen complaint</h2>
+      <form id="cform">
+        <label>Location<select id="cbin"></select></label>
+        <label>Issue<select id="ctype">
+          <option>Overflowing bin</option><option>Garbage dumped near bin</option><option>Foul smell</option><option>Bin damaged</option>
+        </select></label>
+        <label>Your name (optional)<input id="cname" maxlength="40" autocomplete="name"></label>
+        <button class="btn main" type="submit">Submit complaint</button>
+        <p id="fmsg" role="status"></p>
+      </form>
+      <div class="clist" id="clist"></div>
+    </section>
+    <section class="card">
+      <h2>Activity and notifications</h2>
+      <div class="filters" id="filters">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="note" aria-pressed="false">Notifications</button>
+        <button type="button" data-f="sys" aria-pressed="false">System</button>
+      </div>
+      <ul id="log"></ul>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Bin register (database)</h2>
+    <div class="scroll"><table class="stack" id="tbl">
+      <thead><tr><th>Bin</th><th>Location</th><th>Fill</th><th>Status</th><th>Priority</th><th>Last collected</th><th>Pickups</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>How the prototype maps to the flowchart</summary>
+      <ol>
+        <li><b>Input:</b> every 30 simulated minutes, each of the 16 smart bins reports its fill level. Citizen complaints, truck GPS positions and the collection history are also inputs.</li>
+        <li><b>Send and validate:</b> the central system rejects impossible readings (outside 0–100%) and sudden drops with no logged collection. When a reading is rejected, the bin keeps its last valid value. Duplicate complaints for the same bin are merged.</li>
+        <li><b>Decision:</b> a bin needs pickup when it reaches the threshold or has an open complaint. Trucks are dispatched right away for complaints, Critical bins or three or more pending bins. A single non-urgent bin waits up to 60 minutes so nearby bins can be batched into one route. If no bin needs pickup, the system continues monitoring.</li>
+        <li><b>Priority:</b> score = fill % + 25 for a complaint + 15 if overflowing + 10 for sensitive sites (market, hospital, school, transit) + 0.5 per hour since the last pickup (capped at 24 h). A score of 110 or more is Critical.</li>
+        <li><b>Optimised route:</b> bins are assigned to available trucks within capacity (800 kg). Each route visits Critical bins first, then uses nearest-neighbour ordering improved by 2-opt along the street grid. The saving is measured against a fixed-order route.</li>
+        <li><b>Notify and assign:</b> the sanitation team receives the route and the driver is dispatched. Trucks marked for maintenance are skipped.</li>
+        <li><b>Collect and record:</b> the bin resets, the weight is logged and any linked complaint is resolved. The citizen is notified, and the authority as well if the bin is damaged.</li>
+        <li><b>More pending?</b> The truck goes to the next stop or picks up newly urgent bins. Otherwise it returns to the depot to unload, which ends the collection cycle while monitoring continues.</li>
+      </ol>
+      <p>In a real deployment, each bin would carry an ultrasonic fill sensor with a microcontroller (for example, an ESP32) reporting over GSM or LoRa. The trucks would report GPS, and complaints would come from a mobile app.</p>
+    </details>
+  </section>
+  <p class="foot">Proposed prototype concept for an academic assignment. The sensor and vehicle data are simulated.</p>
+</main>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const px=g=>62+g*76;
+const KM=0.3, SPEED=0.22, CAP=800, DEPOT=[0,0];
+const STEPS=[
+ ['start','pill','Start'],
+ ['input','para','Input: bin levels, complaints, schedules, vehicle GPS, records'],
+ ['send','rect','Send data to central system'],
+ ['validate','rect','Validate and process data'],
+ ['decide','dia','Bin nearly full or complaint received?'],
+ ['monitor','rect','Continue monitoring'],
+ ['identify','rect','Identify location and priority'],
+ ['analyze','rect','Analyze bin status, urgency, vehicles, history'],
+ ['route','rect','Generate optimized schedule and route'],
+ ['notifyTeam','para','Output: notify sanitation team'],
+ ['assign','rect','Assign available vehicle'],
+ ['collect','rect','Collect garbage, update bin status and record'],
+ ['linked','dia','Linked to a complaint?'],
+ ['notifyCitizen','para','Output: notify citizen or authority'],
+ ['update','rect','Update database and dashboard'],
+ ['more','dia','More pending bins or complaints?'],
+ ['end','pill','End collection cycle']];
+const SHAPE={pill:'<rect x="1" y="3" width="18" height="10" rx="5"/>',para:'<path d="M5 3h14l-4 10H1z"/>',rect:'<rect x="2" y="3" width="16" height="10" rx="1.5"/>',dia:'<path d="M10 1l8 7-8 7-8-7z"/>'};
+const BINS=[['B01','Central Market',2,1,9,1],['B02','Bus Stand',5,1,7,1],['B03','Govt. School',8,1,4,1],['B04','City Hospital',11,1,6,1],
+ ['B05','Temple Street',1,3,5,0],['B06','Lake Park',4,3,3.5,0],['B07','Apartment Block A',7,3,6,0],['B08','College Gate',10,3,5,0],
+ ['B09','Vegetable Mandi',2,5,10,1],['B10','Metro Station',5,5,7,1],['B11','Housing Colony',8,5,4.5,0],['B12','Tech Park',11,5,4,0],
+ ['B13','Fish Market',0,7,8,1],['B14','Community Hall',3,7,3,0],['B15','Main Road Junction',6,7,6,0],['B16','Residential Lane 4',9,7,3.5,0]];
+const TRUCKS=[['T1','KA-01-W-1021','#1d4ed8'],['T2','KA-01-W-1088','#b45309'],['T3','KA-01-W-1140','#7c3aed']];
+const START={B01:84,B09:79,B13:71,B02:66};
+let S, filter='all';
+
+function init(){
+  S={t:6*60,running:true,speed:+$('#speed').value,thr:+$('#thr').value,nextCheck:0,cSeq:1000,waitKey:'',sel:null,
+    bins:BINS.map(([id,name,gx,gy,rate,sens])=>{const f=START[id]??(12+Math.random()*50);return{id,name,gx,gy,rate,sens,fill:f,rep:f,fault:false,nextRep:6*60+Math.random()*30,lastCol:6*60-(120+Math.random()*900),cols:0,assigned:null,pri:0,force:null}}),
+    trucks:TRUCKS.map(([id,plate,color],i)=>({id,plate,color,x:0,y:0,state:'idle',avail:i<2,route:[],path:[],target:null,load:0,km:0,cBins:0,cKm:0,until:0})),
+    complaints:[],log:[],steps:{},st:{cols:0,rej:0,opt:0,naive:0,cycles:0}};
+  fire('start');
+  log('sys','System started: 16 smart bins online, 2 trucks available, T3 under maintenance.','System');
+}
+const hhmm=t=>{const m=Math.floor(t)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+const ago=t=>{const h=(S.t-t)/60;return h<1?Math.round(h*60)+' min ago':h.toFixed(1)+' h ago'};
+const bin=id=>S.bins.find(b=>b.id===id);
+const man=(a,b)=>Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1]);
+const pos=b=>[b.gx,b.gy];
+function fire(k){const s=S.steps[k]||(S.steps[k]={n:0,at:0});s.n++;s.at=performance.now()}
+function log(kind,text,ch){S.log.unshift({t:S.t,kind,ch,text});if(S.log.length>250)S.log.pop()}
+const openC=id=>S.complaints.filter(c=>c.bin===id&&c.status!=='Resolved');
+function priority(b){let p=b.rep;if(openC(b.id).length)p+=25;if(b.rep>=95)p+=15;if(b.sens)p+=10;p+=Math.min(24,(S.t-b.lastCol)/60)*.5;return Math.round(p)}
+const urg=p=>p>=110?'Critical':p>=90?'High':'Medium';
+const pending=()=>S.bins.filter(b=>!b.assigned&&(b.rep>=S.thr||openC(b.id).length));
+
+function plen(st,seq,end){let d=0,p=st;for(const b of seq){d+=man(p,pos(b));p=pos(b)}if(end)d+=man(p,end);return d}
+function nn(st,list){const left=list.slice(),out=[];let p=st;while(left.length){let bi=0;left.forEach((b,i)=>{if(man(p,pos(b))<man(p,pos(left[bi])))bi=i});const b=left.splice(bi,1)[0];out.push(b);p=pos(b)}return out}
+function twoOpt(st,seq,end){let best=seq.slice(),bl=plen(st,best,end),imp=true;while(imp){imp=false;for(let i=0;i<best.length-1;i++)for(let j=i+1;j<best.length;j++){const c=best.slice(0,i).concat(best.slice(i,j+1).reverse(),best.slice(j+1));const l=plen(st,c,end);if(l<bl-1e-9){best=c;bl=l;imp=true}}}return best}
+function optimise(st,bins){const crit=bins.filter(b=>b.pri>=110),rest=bins.filter(b=>b.pri<110);let p=st,out=[];
+  [[crit,rest.length?null:DEPOT],[rest,DEPOT]].forEach(([g,end])=>{if(!g.length)return;const s=twoOpt(p,nn(p,g),end);out=out.concat(s);p=pos(s.at(-1))});return out}
+
+function check(){
+  fire('decide');
+  const pend=pending();
+  S.bins.forEach(b=>{if(!pend.includes(b))b.since=null});
+  if(!pend.length){fire('monitor');S.waitKey='';return}
+  pend.forEach(b=>{b.since??=S.t;b.pri=priority(b)});
+  const go=pend.length>=3||pend.some(b=>b.pri>=110||openC(b.id).length||S.t-b.since>=60);
+  if(!go){fire('monitor');const key='hold'+pend.map(b=>b.id).join(',');
+    if(key!==S.waitKey){S.waitKey=key;log('sys',`${pend.map(b=>b.id).join(', ')} need pickup soon. Holding for up to 60 min to batch nearby bins into one route.`,'Scheduler')}return}
+  dispatch(pend,S.trucks.filter(k=>k.avail&&k.state==='idle'));
+}
+function dispatch(pend,trucks){
+  fire('identify');
+  pend.forEach(b=>b.pri=priority(b));pend.sort((a,b)=>b.pri-a.pri);
+  fire('analyze');
+  if(!trucks.length){const key=pend.map(b=>b.id).join(',');if(key!==S.waitKey){S.waitKey=key;log('sys',`${pend.length} bin(s) need pickup (${key}). All available trucks are busy, so they are queued for the next free truck.`,'Scheduler')}return}
+  S.waitKey='';
+  const plan=new Map(trucks.map(k=>[k,{bins:[],kg:k.load}]));
+  for(const b of pend){let best=null,bd=1e9;
+    for(const [k,p] of plan){if(p.kg+b.rep*1.2>CAP)continue;const pts=[[k.x,k.y],...p.bins.map(pos)];const d=Math.min(...pts.map(q=>man(q,pos(b))))+p.bins.length*2;if(d<bd){bd=d;best=k}}
+    if(best){const p=plan.get(best);p.bins.push(b);p.kg+=b.rep*1.2}}
+  for(const [k,p] of plan){if(!p.bins.length)continue;
+    const st=[Math.round(k.x),Math.round(k.y)];
+    const seq=optimise(st,p.bins);const o=plen(st,seq,DEPOT);
+    const naive=plen(st,p.bins.slice().sort((a,b)=>a.id<b.id?-1:1),DEPOT);
+    S.st.opt+=o;S.st.naive+=naive;fire('route');
+    seq.forEach(b=>{b.assigned=k.id;b.since=null;openC(b.id).forEach(c=>{c.status='Scheduled';c.truck=k.id})});
+    k.route=k.route.concat(seq.map(b=>b.id));
+    const eta=S.t+o/SPEED+seq.length*5;
+    fire('notifyTeam');
+    log('note',`Route for ${k.id} (${k.plate}): ${seq.map(b=>`${b.id}${b.pri>=110?'!':''}`).join(' → ')} → Depot. ${(o*KM).toFixed(1)} km vs ${(naive*KM).toFixed(1)} km fixed order. Back by about ${hhmm(eta)}.`,'Sanitation team');
+    fire('assign');
+    log('note',`${k.id} dispatched to ${seq.length} bin(s). First stop: ${seq[0].name} (${urg(seq[0].pri)}).`,'Driver');
+    seq.forEach(b=>openC(b.id).forEach(c=>log('note',`Complaint ${c.id}: truck ${k.id} is on the way to ${b.name}.`,'Citizen')));
+    if(k.state==='idle'||k.state==='collecting')next(k);
+  }
+}
+function path(a,b){return[[b[0],a[1]],[b[0],b[1]]]}
+function next(k){
+  if(k.route.length){const b=bin(k.route[0]);k.target=b.id;k.path=path([k.x,k.y],pos(b));k.state='enroute'}
+  else{k.target='DEPOT';k.path=path([k.x,k.y],DEPOT);k.state='returning'}
+}
+function move(k,dt){
+  if(k.state==='collecting'){if(S.t>=k.until)collected(k);return}
+  if(k.state==='unloading'){if(S.t>=k.until)endCycle(k);return}
+  if(k.state!=='enroute'&&k.state!=='returning')return;
+  let rem=SPEED*dt;
+  while(rem>1e-9&&k.path.length){const[tx,ty]=k.path[0],dx=tx-k.x,dy=ty-k.y,d=Math.abs(dx)+Math.abs(dy);
+    if(d<=rem){k.x=tx;k.y=ty;rem-=d;k.km+=d*KM;k.cKm+=d*KM;k.path.shift()}
+    else{k.x+=Math.sign(dx)*rem;k.y+=Math.sign(dy)*rem;k.km+=rem*KM;k.cKm+=rem*KM;rem=0}}
+  if(!k.path.length){
+    if(k.state==='enroute'){k.state='collecting';k.until=S.t+5}
+    else{k.state='unloading';k.until=S.t+10;log('sys',`${k.id} reached the depot to unload ${k.load} kg.`,'Driver')}
+  }
+}
+function collected(k){
+  const b=bin(k.target);fire('collect');
+  const kg=Math.round(b.fill*1.2);k.load+=kg;b.fill=2+Math.random()*3;b.rep=b.fill;b.fault=false;b.lastCol=S.t;b.cols++;b.assigned=null;
+  S.st.cols++;k.cBins++;k.route.shift();
+  log('sys',`${k.id} collected ${kg} kg at ${b.id} ${b.name}. Bin now at ${b.rep.toFixed(0)}%. Record saved.`,'Collection');
+  fire('linked');
+  const cs=openC(b.id);
+  if(cs.length){fire('notifyCitizen');cs.forEach(c=>{c.status='Resolved';c.resolved=S.t;c.truck=k.id;
+    log('note',`Complaint ${c.id} (${c.type}) at ${b.name} was resolved by ${k.id} at ${hhmm(S.t)}.${c.name?' Thank you, '+c.name+'.':''}`,'Citizen');
+    if(c.type==='Bin damaged')log('note',`Bin ${b.id} at ${b.name} was reported damaged. A replacement has been requested from the ward health officer.`,'Authority')})}
+  fire('update');fire('more');
+  if(k.route.length){next(k);return}
+  const pend=pending();
+  if(pend.length&&k.load<CAP*.75&&k.avail){log('sys',`${k.id} has spare capacity, so the system is re-planning to include new urgent bins.`,'Scheduler');dispatch(pend,[k]);if(k.route.length)return}
+  next(k);
+}
+function endCycle(k){fire('end');S.st.cycles++;
+  log('sys',`${k.id} collection cycle ended: ${k.cBins} bin(s), ${k.cKm.toFixed(1)} km, ${k.load} kg unloaded. Monitoring continues.`,'Scheduler');
+  k.load=0;k.cBins=0;k.cKm=0;k.state='idle';k.target=null;S.nextCheck=0}
+
+function sense(){
+  for(const b of S.bins){if(S.t<b.nextRep)continue;b.nextRep=S.t+30;
+    fire('input');fire('send');fire('validate');
+    let v=b.fill+(Math.random()*4-2),bad=null;
+    if(b.force!=null){v=b.force;b.force=null}else if(Math.random()<.005)v=Math.random()<.5?125+Math.random()*60:-6-Math.random()*20;
+    if(v>105||v<-3)bad=`out-of-range value ${v.toFixed(0)}%`;
+    else if(b.rep-v>25)bad=`sudden drop ${b.rep.toFixed(0)}% → ${v.toFixed(0)}% with no collection logged`;
+    if(bad){b.fault=true;S.st.rej++;log('sys',`Rejected a reading from ${b.id} ${b.name}: ${bad}. Kept the last valid value.`,'Validation')}
+    else{const was=b.rep;b.fault=false;b.rep=Math.max(0,Math.min(100,v));if(was<S.thr&&b.rep>=S.thr){log('sys',`${b.id} ${b.name} crossed ${S.thr}% (now ${b.rep.toFixed(0)}%).`,'Sensor');S.nextCheck=0}}}
+}
+function step(dt){
+  S.t+=dt;
+  S.bins.forEach(b=>{const busy=S.trucks.some(k=>k.state==='collecting'&&k.target===b.id);if(!busy)b.fill=Math.min(100,b.fill+b.rate*dt/60*(.6+.8*Math.random()))});
+  sense();
+  if(S.t>=S.nextCheck){S.nextCheck=S.t+30;check()}
+  S.trucks.forEach(k=>move(k,dt));
+}
+
+/* ---------- rendering ---------- */
+const set=(el,h)=>{if(el._h!==h){el.innerHTML=h;el._h=h}};
+const col=b=>b.rep>=S.thr?'var(--bad)':b.rep>=50?'var(--warn)':'var(--ok)';
+function status(b){const k=S.trucks.find(k=>k.target===b.id&&k.state==='collecting');
+  if(k)return['Collecting · '+k.id,'var(--ok)'];if(b.fault)return['Sensor fault','var(--bad)'];if(b.assigned)return['Scheduled · '+b.assigned,'#2563eb'];
+  if(b.rep>=99.5)return['Overflowing','var(--bad)'];if(b.rep>=S.thr)return['Needs pickup','var(--bad)'];return['OK','var(--muted)']}
+const PARKS=new Set(['3,2','4,2','3,3','4,3','9,5','10,5']);
+const BLOCKS=(()=>{let h='';for(let x=0;x<11;x++)for(let y=0;y<7;y++){const p=PARKS.has(x+','+y);h+=`<rect x="${px(x)+10}" y="${px(y)+10}" width="56" height="56" rx="6" fill="var(${p?'--park':'--block'})"/>`}
+  return h+`<ellipse cx="${px(3.5)}" cy="${px(3)}" rx="56" ry="34" fill="#7fb8d8" opacity=".55"/><text x="${px(3.5)}" y="${px(3)+5}" text-anchor="middle" font-size="12" fill="var(--muted)">Lake</text>`})();
+function renderMap(){
+  let h=`<rect width="960" height="640" fill="var(--road)"/>`+BLOCKS;
+  S.trucks.forEach(k=>{if(k.state==='idle'||k.state==='unloading')return;
+    let pts=[[k.x,k.y],...k.path],p=k.path.length?k.path.at(-1):[k.x,k.y];
+    k.route.slice(k.state==='enroute'||k.state==='collecting'?1:0).forEach(id=>{const b=bin(id);pts=pts.concat(path(p,pos(b)));p=pos(b)});
+    if(k.state!=='returning')pts=pts.concat(path(p,DEPOT));
+    h+=`<polyline points="${pts.map(q=>px(q[0])+','+px(q[1])).join(' ')}" fill="none" stroke="${k.color}" stroke-width="4" stroke-dasharray="9 7" stroke-linejoin="round" opacity=".85"/>`});
+  h+=`<g transform="translate(${px(0)},${px(0)})"><rect x="-28" y="-17" width="56" height="34" rx="7" fill="var(--brand)"/><text y="5" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Depot</text></g>`;
+  const C=2*Math.PI*15;
+  S.bins.forEach(b=>{const c=col(b),oc=openC(b.id).length,sel=S.sel===b.id;
+    h+=`<g class="bin" data-bin="${b.id}" transform="translate(${px(b.gx)},${px(b.gy)})"><title>${esc(b.name)}: ${b.rep.toFixed(0)}%</title>
+    ${b.assigned?`<circle r="25" fill="none" stroke="${S.trucks.find(k=>k.id===b.assigned).color}" stroke-width="3" stroke-dasharray="5 4"/>`:''}
+    <circle r="20" fill="var(--panel)" stroke="${sel?'var(--ink)':'none'}" stroke-width="3"/>
+    <circle r="15" fill="none" stroke="var(--line)" stroke-width="6"/>
+    <circle r="15" fill="none" stroke="${c}" stroke-width="6" stroke-dasharray="${(b.rep/100*C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90)"/>
+    <text y="4" text-anchor="middle" font-size="11" font-weight="800" fill="var(--ink)">${b.rep.toFixed(0)}</text>
+    <text y="37" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)" stroke="var(--road)" stroke-width="4" paint-order="stroke">${b.id}</text>
+    ${oc?`<circle cx="15" cy="-15" r="7" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`:''}
+    ${b.fault?`<g transform="translate(-16,-16)"><circle r="8" fill="var(--bad)"/><text y="4" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">!</text></g>`:''}</g>`});
+  let atDepot=0;
+  S.trucks.forEach(k=>{if(!k.avail&&k.state==='idle')return;let ox=0,oy=-30;
+    if((k.state==='idle'||k.state==='unloading')){ox=48+atDepot*38;oy=0;atDepot++}
+    h+=`<g transform="translate(${(px(k.x)+ox).toFixed(1)},${(px(k.y)+oy).toFixed(1)})"><rect x="-17" y="-11" width="34" height="22" rx="5" fill="${k.color}" stroke="var(--panel)" stroke-width="2"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">${k.id}</text></g>`});
+  set($('#map'),h);
+}
+function renderFlow(){const now=performance.now();
+  set($('#flow'),STEPS.map(([k,sh,l])=>{const s=S.steps[k]||{n:0,at:-1e9};return`<li class="${now-s.at<1300?'hot':''}"><svg viewBox="0 0 20 16">${SHAPE[sh]}</svg><span>${l}</span><em>${s.n}</em></li>`}).join(''))}
+function renderKpis(){const avg=S.bins.reduce((a,b)=>a+b.rep,0)/S.bins.length,need=S.bins.filter(b=>b.rep>=S.thr).length,
+  open=S.complaints.filter(c=>c.status!=='Resolved').length,km=S.trucks.reduce((a,k)=>a+k.km,0),sav=S.st.naive?Math.round((1-S.st.opt/S.st.naive)*100)+'%':'—';
+  set($('#kpis'),[[avg.toFixed(0)+'%','Average bin fill'],[need,'Bins at or above threshold'],[open,'Open complaints'],[S.st.cols,'Pickups completed'],[km.toFixed(1)+' km','Distance driven'],[sav,'Shorter than fixed-order routes'],[S.st.rej,'Bad readings rejected']]
+   .map(([v,l])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join(''))}
+const TS={idle:'At depot, ready',enroute:'Driving to',collecting:'Collecting at',returning:'Returning to depot',unloading:'Unloading at depot'};
+function renderTrucks(){set($('#trucks'),S.trucks.map(k=>{const st=!k.avail?'Under maintenance':TS[k.state]+(k.state==='enroute'||k.state==='collecting'?' '+bin(k.target).name:'');
+  const rest=k.route.slice(k.state==='enroute'||k.state==='collecting'?1:0);
+  return`<div class="truck"><header><b><span class="tag" style="background:${k.color}"></span>${k.id} · ${k.plate}</b>
+  <button class="btn" data-t="${k.id}" ${k.state!=='idle'?'disabled':''}>${k.avail?'Send to maintenance':'Mark available'}</button></header>
+  <p>${st}${rest.length?` · then ${rest.join(', ')}`:''}</p>
+  <div class="bar" title="Load"><i style="width:${Math.min(100,k.load/CAP*100)}%;background:${k.color}"></i></div>
+  <p>Load ${k.load} / ${CAP} kg · ${k.km.toFixed(1)} km today</p></div>`}).join(''))}
+function renderComplaints(){set($('#clist'),S.complaints.length?S.complaints.map(c=>`<div class="c"><b>${c.id}</b><span>${esc(bin(c.bin).name)} · ${esc(c.type)}${c.dups?` · +${c.dups} duplicate`:''}<br><small style="color:var(--muted)">${c.status==='Resolved'?'Resolved '+hhmm(c.resolved)+' by '+c.truck:c.status==='Scheduled'?'Truck '+c.truck+' assigned':'Received '+hhmm(c.at)}</small></span><span class="chip s-${c.status}">${c.status}</span></div>`).join(''):'<p class="sub" style="margin:0">No complaints yet. Submit one above to watch it get routed and resolved.</p>')}
+function renderLog(){set($('#log'),S.log.filter(e=>filter==='all'||e.kind===filter).slice(0,120).map(e=>`<li class="${e.kind}"><time>${hhmm(e.t)}</time><span><b>${esc(e.ch)}</b>${esc(e.text)}</span></li>`).join(''))}
+function renderTable(){set($('#tbl tbody'),S.bins.map(b=>{const[s,sc]=status(b);return`<tr data-bin="${b.id}" class="${S.sel===b.id?'on':''}"><td><b>${b.id}</b></td><td>${esc(b.name)}</td>
+  <td><div class="fillcell"><div class="bar"><i style="width:${b.rep}%;background:${col(b)}"></i></div><span>${b.rep.toFixed(0)}%</span></div></td>
+  <td><span class="st" style="color:${sc}">${s}</span></td><td>${b.rep>=S.thr||openC(b.id).length?urg(priority(b))+' · '+priority(b):'—'}</td><td class="n">${ago(b.lastCol)}</td><td class="n">${b.cols}</td></tr>`}).join(''))}
+function renderSel(){const b=S.sel&&bin(S.sel);set($('#sel'),b?`<b>${b.id} ${esc(b.name)}</b>: ${b.rep.toFixed(0)}% full, ${status(b)[0].toLowerCase()}, last collected ${ago(b.lastCol)}, fills about ${b.rate}% per hour${b.sens?', sensitive site':''}.`:'')}
+function render(){const d=Math.floor(S.t/1440)+1;$('#clock').innerHTML=`Day ${d} · ${hhmm(S.t)}<small>Simulated ward time</small>`;
+  renderKpis();renderMap();renderFlow();renderTrucks();renderComplaints();renderLog();renderTable();renderSel()}
+
+/* ---------- controls ---------- */
+function fillSelect(){$('#cbin').innerHTML=S.bins.map(b=>`<option value="${b.id}">${b.id} · ${esc(b.name)}</option>`).join('')}
+function select(id){S.sel=id;$('#cbin').value=id;render()}
+$('#map').addEventListener('pointerdown',e=>{const g=e.target.closest('[data-bin]');if(g)select(g.dataset.bin)});
+$('#tbl').addEventListener('pointerdown',e=>{const r=e.target.closest('tr[data-bin]');if(r)select(r.dataset.bin)});
+$('#play').onclick=()=>{S.running=!S.running;$('#play').textContent=S.running?'Pause':'Resume'};
+$('#speed').onchange=e=>S.speed=+e.target.value;
+$('#thr').oninput=e=>{S.thr=+e.target.value;$('#thrv').textContent=S.thr+'%';S.nextCheck=0;render()};
+$('#cycle').onclick=()=>{check();render()};
+$('#fault').onclick=()=>{const b=S.bins[Math.floor(Math.random()*S.bins.length)];b.force=Math.random()<.5||b.rep<45?140+Math.random()*40:b.rep-38;b.nextRep=S.t;sense();render()};
+$('#reset').onclick=()=>{init();S.running=true;$('#play').textContent='Pause';$('#fmsg').textContent='';render()};
+$('#trucks').addEventListener('click',e=>{const t=e.target.closest('button[data-t]');if(!t||t.disabled)return;const k=S.trucks.find(k=>k.id===t.dataset.t);
+  k.avail=!k.avail;log('sys',`${k.id} ${k.avail?'is back in service':'was sent for maintenance'}.`,'Fleet');S.nextCheck=0;render()});
+$('#filters').addEventListener('click',e=>{const b=e.target.closest('button[data-f]');if(!b)return;filter=b.dataset.f;
+  document.querySelectorAll('#filters button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderLog()});
+$('#cform').addEventListener('submit',e=>{e.preventDefault();
+  const b=bin($('#cbin').value),type=$('#ctype').value,name=$('#cname').value.trim().slice(0,40);
+  fire('input');fire('send');fire('validate');
+  const ex=openC(b.id)[0];
+  if(ex){ex.dups++;log('sys',`Duplicate complaint for ${b.id} ${b.name} was merged into ${ex.id}.`,'Validation');$('#fmsg').textContent=`Already reported as ${ex.id} (${ex.status}). Your report has been added to it.`;render();return}
+  const c={id:'C-'+(++S.cSeq),bin:b.id,type,name,at:S.t,status:b.assigned?'Scheduled':'Received',truck:b.assigned};
+  S.complaints.unshift(c);log('note',`Complaint ${c.id} received: ${type} at ${b.name}.`,'Citizen');
+  $('#fmsg').textContent=`Logged as ${c.id}. Watch it get routed on the map.`;$('#cname').value='';S.nextCheck=0;render()});
+
+init();fillSelect();render();
+setInterval(()=>{if(S.running){const n=S.speed;for(let i=0;i<n;i++)step(3.75)}render()},250);
+}
+</script>
+</body>
+</html>
