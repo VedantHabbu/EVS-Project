@@ -2,6 +2,8 @@
 
 **A digital solution for irregular garbage collection (EVS assignment prototype)**
 
+**🔗 Live demo:** [Live simulation](https://vedanthabbu.github.io/EVS-Project/) · [Guided walkthrough](https://vedanthabbu.github.io/EVS-Project/walkthrough.html)
+
 This is a working web prototype of a smart waste collection system for a city ward. It has two pages, both in dark theme:
 
 - **`index.html`, the live simulation:** everything runs on its own. You can file complaints, inject sensor faults, change the threshold and take trucks out of service.
@@ -74,7 +76,7 @@ There is nothing to install. It is a single HTML file.
 1. Push this folder to a GitHub repository.
 2. Go to **Settings → Pages**.
 3. Under **Build and deployment**, choose **Deploy from a branch**, select `main` and `/ (root)`, then click **Save**.
-4. After a minute the site is live at `https://<your-username>.github.io/<repo-name>/`. The walkthrough is at `.../walkthrough.html`.
+4. After a minute the site is live, e.g. this project at https://vedanthabbu.github.io/EVS-Project/ (walkthrough: https://vedanthabbu.github.io/EVS-Project/walkthrough.html).
 
 ## Demo walkthrough
 
